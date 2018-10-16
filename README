@@ -1,0 +1,3 @@
+Uses wpa_supplicant config file to connect to the wifi. 
+Also an vpn connection can be done after connecting to wifi.
+I might make an intactive wifi manager out of it. We'll cee
