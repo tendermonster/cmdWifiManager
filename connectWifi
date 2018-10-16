@@ -1,0 +1,85 @@
+#!/bin/bash
+
+args=$@
+#todo find wlan adapter automatically 
+istate=$(cat /sys/class/net/wlp2s0/operstate)
+conf="/etc/wpa_supplicant/wpa_supplicant.conf"
+#vpnKey="path/to/your.ovpn"
+nic="wlp2s0"
+log="/var/log/wlanlog"
+
+function connect(){
+	echo "wanting to connect :>"
+	echo "" > $log
+	pidof wpa_supplicant 2&>/dev/null
+	if [ $? = 1 ]; then
+		wpa_supplicant -B -c $conf -i $nic -f $log
+	fi
+	if [ $istate = "down" ]; then
+		ip link set $nic up
+	fi
+	dhcpcd -4 $nic
+	sleep 1
+	#connectVPN
+}
+
+function connectVPN(){
+	pidof openvpn 2&>/dev/null
+	if [ $? = 0 ]; then
+		sudo kill $(pidof openvpn)
+		sudo openvpn --config $vpnKey --daemon
+	else sudo openvpn --config $vpnKey --daemon
+	fi
+}
+
+function disconnect(){
+	killall wpa_supplicant 2&>/dev/null
+	pidof openvpn 2&>/dev/null
+	if [ $? = 0 ]; then
+		sudo kill $(pidof openvpn)
+	fi
+}
+
+function reconnect(){
+	disconnect
+	sleep 2
+	connect
+	#connectVPN
+}
+
+function info(){
+	iw dev $nic link
+}
+
+function showLog(){
+	tail -f $log
+}
+
+function listNetworks(){
+	if [ $istate = "down" ]; then
+		sudo ip link set $nic up
+	fi
+	sudo iw dev $nic scan | grep SSID
+}
+
+function helpList(){
+	  echo "Usage: $0 with no args will connect to wifi"
+  	  echo "-c --connect  connect to wifi"
+	  echo "-d --disconnect disconnect from wifi"
+	  echo "-r --restart restert connection"
+	  echo "-s --status  status"
+	  echo "-l --log shows $log"
+	  echo "-n --networks available networks "
+	  echo "-h displays this infos"
+}
+
+case "$1" in
+	-c| --connect)connect;;
+	-d| --disconnect)disconnect ;;
+	-n| --networks)listNetworks;;
+	-l| --log)showLog;;
+	-r| --reconnect)reconnect;;
+	-s| --status)info;;
+	-h) helpList;;
+	*)helpList
+esac
